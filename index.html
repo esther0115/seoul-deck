@@ -61,6 +61,20 @@ h2{font-size:17px;margin:20px 0 0;text-wrap:balance}
 .rptest{margin-top:6px;font-size:13px}.rptest .chips{margin-top:6px}
 .pick{font-size:13px;padding:8px 11px;border-radius:10px;background:var(--card2);border-left:3px solid var(--warn)}.pick b{color:var(--warn);font-weight:600;margin-right:6px}
 .swapto{display:block;margin-top:6px;font:inherit;font-size:12px;color:var(--ink);background:none;border:1px solid var(--line);border-radius:999px;padding:3px 10px;cursor:pointer;text-align:left}
+/* 下一站固定栏、给司机看（10-31） */
+.nextbar{position:fixed;left:0;right:0;bottom:0;z-index:40;padding:8px 16px calc(8px + env(safe-area-inset-bottom));background:color-mix(in srgb,var(--bg2) 94%,transparent);border-top:1px solid var(--line);backdrop-filter:blur(8px)}
+.nextbar .nb{max-width:860px;margin:0 auto;display:grid;gap:6px}
+.nextbar .nt{font-size:13px;color:var(--mute);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.nextbar .nt b{color:var(--ink);font-size:15px;margin-right:4px}
+.nextbar .row{display:flex;gap:6px;flex-wrap:wrap}
+.nextbar .row a,.nextbar .row button{font:inherit;font-size:13px;color:var(--ink);background:var(--card2);border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer;text-decoration:none}
+.nextbar .row .go{background:var(--accent);color:var(--on-accent);border-color:var(--accent);font-weight:600}
+body.hasbar{padding-bottom:124px}
+.driver{position:fixed;inset:0;z-index:60;background:#fff;color:#111;display:grid;align-content:center;gap:18px;padding:24px;text-align:center}
+.driver .dk{font-size:clamp(30px,9vw,56px);font-weight:800;line-height:1.25;word-break:keep-all}
+.driver .da{font-size:clamp(22px,6.5vw,40px);font-weight:700;line-height:1.35;word-break:keep-all}
+.driver .dp{font-size:clamp(20px,5.5vw,32px)}.driver .dz{font-size:15px;color:#555}
+.driver .dr{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.driver button{font:inherit;font-size:16px;padding:10px 18px;border-radius:999px;border:1px solid #bbb;background:#f3f3f3;color:#111;cursor:pointer}
 .whyold{margin-top:4px;font-size:13px;color:var(--mute)}.whyold summary{font-size:12px}
 /* 这天的状态（10-29）：比主题按钮小一号，跟在主题下面 */
 .states{display:flex;flex-wrap:wrap;align-items:center;gap:6px}.states .sl{font-size:13px;font-weight:700;color:var(--warm);margin-right:2px}
@@ -328,6 +342,8 @@ a:focus-visible,button:focus-visible,select:focus-visible,summary:focus-visible{
 <h2>说明</h2>
 <ul class="note" id="notes"></ul>
 </main>
+<div class="nextbar" id="nextBar" hidden aria-live="polite"></div>
+<div class="driver" id="driver" hidden role="dialog" aria-modal="true" aria-label="给司机看的地址"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -495,7 +511,7 @@ function renderDay(){
     for(let i=0;i+1<pts.length;i+=5)segs.push([i,pts.slice(i,i+6)]);
     $('#navAll').innerHTML=rest.length?'<span>在 Kakao 地图打开整天步行路线：</span>'+segs.map(([i,s])=>`<a href="${导航(s)}" target="_blank" rel="noopener">${segs.length>1?`第 ${k+i+(i?0:1)}–${k+i+s.length-1} 站`:'全部'}</a>`).join(''):''; }
   $('#day').innerHTML=day.map((p,i)=>card(p,i,legs[i])).join('');
-  renderWhy();
+  renderWhy();renderNext();
   document.querySelectorAll('#day .swapto').forEach(b=>b.onclick=()=>{const a=D.池.find(q=>q.店===b.dataset.to);if(a){day[+b.dataset.i]=a;renderDay();buildWhere();draw()}});
   document.querySelectorAll('#day select').forEach(s=>s.onchange=()=>{const i=+s.dataset.i,a=(D.候补[day[i].组]||[]).find(x=>x.店===s.value);if(a){day[i]=a;renderDay();buildWhere();draw()}});
   document.querySelectorAll('#day .also button').forEach(b=>b.onclick=()=>{wrap.scrollIntoView({block:'center',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
@@ -819,6 +835,27 @@ function renderWhy(){const T=D.主题[ti],why=T.为什么||'',base=T.站,el=$('#
   const 去=base.filter(p=>!day.some(q=>q.店===p.店)).map(short),加=day.filter(q=>!base.some(p=>p.店===q.店)).map(short);
   el.hidden=false;
   el.innerHTML=`<span class="ai-badge">路线改过了</span>${去.length?`去掉了 ${esc(去.join('、'))}；`:''}${加.length?`加了 ${esc(加.join('、'))}；`:''}${!去.length&&!加.length?'调整了顺序；':''}现在 ${day.length} 站。${why?`<details class="whyold"><summary>原来的说明（按改之前的路线写的）</summary>${esc(why)}</details>`:''}`}
+/* 下一站固定栏（10-31，外部意见「当天执行」：下一站、到达方式、入店提示放在随手能点的地方）：
+   往下翻到路线时出现在屏幕底部；显示下一站、约几点到、怎么过去；「这站走完了」接「走到哪了」（setProg），剩下的从现在重算；
+   「给司机看」全屏大字显示韩文店名和地址（130 个站点都有 Kakao 韩文地址） */
+function renderNext(){const k=prog.done,p=day[k],bar=$('#nextBar');if(!p){bar.hidden=true;document.body.classList.remove('hasbar');return}
+  const leg=schedule(day)[k],from=k?点(day[k-1]):{名:st().名,xy:st().xy},how=leg.坐车?`步行要 ${leg.步行} 分钟，建议坐车`:`步行约 ${leg.步行} 分钟`;
+  bar.innerHTML=`<div class="nb"><div class="nt"><b>下一站 ${k+1}/${day.length} · ${esc(short(p))}</b>约 ${约(leg.到)} 到 · ${how}${p.休息文?' · '+esc(p.休息文):''}</div>
+    <div class="row"><a href="${导航([from,点(p)])}" target="_blank" rel="noopener">步行导航</a><button type="button" data-n="driver">给司机看</button>${k<day.length-1?`<button type="button" class="go" data-n="done">这站走完了</button>`:''}</div></div>`;
+  showNext()}
+function showNext(){const bar=$('#nextBar'),top=$('#dayTop'),on=!!day[prog.done]&&!!top&&top.getBoundingClientRect().top<innerHeight*0.6&&$('#day').getBoundingClientRect().bottom>innerHeight*0.4;
+  bar.hidden=!on;document.body.classList.toggle('hasbar',on)}
+addEventListener('scroll',()=>{if(day&&day.length)showNext()},{passive:true});
+$('#nextBar').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.n==='done'){setProg(prog.done+1);const c=$('#stop'+prog.done);if(c)c.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'})}
+  if(b.dataset.n==='driver'){const p=day[prog.done],d=$('#driver');
+    d.innerHTML=`<div class="dk">${esc(p.韩文名||p.店)}</div><div class="da">${esc(p.地址||'')}</div><div class="dp">이 주소로 가 주세요</div><div class="dz">请带我去这个地址 · ${esc(zh(p))}</div>
+      <div class="dr"><button type="button" data-d="copy">复制地址</button><button type="button" data-d="x">关闭</button></div>`;
+    d.hidden=false;d.querySelector('[data-d=x]').focus()}});
+$('#driver').addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.d==='x')return void($('#driver').hidden=true);
+  if(b.dataset.d==='copy'){const p=day[prog.done];try{await navigator.clipboard.writeText(p.地址||'');b.textContent='已复制'}catch(_){b.textContent='复制不了，请长按地址'}}});
+addEventListener('keydown',e=>{if(e.key==='Escape')$('#driver').hidden=true});
 function setTheme(i){ti=i;day=stateDay();resetReplan();
   me={xy:st().xy.slice(),label:st().名,idx:-1};renderThemes();renderDay();buildWhere();closeSheet();view.tilt>1?fitIsland():fit()}
 $('#themes').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setTheme(+b.dataset.t)});
