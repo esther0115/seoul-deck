@@ -69,6 +69,7 @@ h2{font-size:17px;margin:20px 0 0;text-wrap:balance}
 .nextbar .row a,.nextbar .row button{font:inherit;font-size:13px;color:var(--ink);background:var(--card2);border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer;text-decoration:none}
 .nextbar .row .go{background:var(--accent);color:var(--on-accent);border-color:var(--accent);font-weight:600}
 body.hasbar{padding-bottom:124px}
+.links .drv{font:inherit;font-size:13px;color:var(--ink);background:var(--card2);border:1px solid var(--line);border-radius:999px;padding:3px 12px;cursor:pointer}
 .driver{position:fixed;inset:0;z-index:60;background:#fff;color:#111;display:grid;align-content:center;gap:18px;padding:24px;text-align:center}
 .driver .dk{font-size:clamp(30px,9vw,56px);font-weight:800;line-height:1.25;word-break:keep-all}
 .driver .da{font-size:clamp(22px,6.5vw,40px);font-weight:700;line-height:1.35;word-break:keep-all}
@@ -445,7 +446,7 @@ function body(p){
     <div class="tip when">${when.length?when.join('<br>'):'营业时间没人提到，出发前在地图上确认'}</div>
     ${qs?`<details><summary>看去过的人怎么说</summary><div class="qs">${qs}</div></details>`:''}
     ${lq}
-    <div class="links">${p.kakao链接?`<a href="${esc(p.kakao链接)}" target="_blank" rel="noopener">Kakao 地图</a>`:''}<a href="${n}" target="_blank" rel="noopener">Naver 地图</a><a href="${g}" target="_blank" rel="noopener">Google 地图</a>`;
+    <div class="links">${p.地址?`<button type="button" class="drv" data-k="${esc(p.韩文名||p.店)}" data-a="${esc(p.地址)}" data-z="${esc(zh(p))}">给司机看</button>`:''}${p.kakao链接?`<a href="${esc(p.kakao链接)}" target="_blank" rel="noopener">Kakao 地图</a>`:''}<a href="${n}" target="_blank" rel="noopener">Naver 地图</a><a href="${g}" target="_blank" rel="noopener">Google 地图</a>`;
 }
 /* 顺路还能去：离这一站 250 米内，小红书有人推荐的优先，其次 Kakao 人气 */
 const pick=o=>o.stop!==undefined?day[o.stop]:o.cand!==undefined?D.池[o.cand]:D.发现[o.disc];
@@ -848,13 +849,17 @@ function showNext(){const bar=$('#nextBar'),top=$('#dayTop'),on=!!day[prog.done]
 addEventListener('scroll',()=>{if(day&&day.length)showNext()},{passive:true});
 $('#nextBar').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
   if(b.dataset.n==='done'){setProg(prog.done+1);const c=$('#stop'+prog.done);if(c)c.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'})}
-  if(b.dataset.n==='driver'){const p=day[prog.done],d=$('#driver');
-    d.innerHTML=`<div class="dk">${esc(p.韩文名||p.店)}</div><div class="da">${esc(p.地址||'')}</div><div class="dp">이 주소로 가 주세요</div><div class="dz">请带我去这个地址 · ${esc(zh(p))}</div>
-      <div class="dr"><button type="button" data-d="copy">复制地址</button><button type="button" data-d="x">关闭</button></div>`;
-    d.hidden=false;d.querySelector('[data-d=x]').focus()}});
+  if(b.dataset.n==='driver'){const p=day[prog.done];司机(p.韩文名||p.店,p.地址||'',zh(p))}});
+/* 给司机看：固定栏的下一站和每张店卡（10-31 加到店卡，提前看任意一站或候补店的地址）共用 */
+let 司机址='';
+function 司机(k,a,z){const d=$('#driver');司机址=a;
+  d.innerHTML=`<div class="dk">${esc(k)}</div><div class="da">${esc(a)}</div><div class="dp">이 주소로 가 주세요</div><div class="dz">请带我去这个地址 · ${esc(z)}</div>
+    <div class="dr"><button type="button" data-d="copy">复制地址</button><button type="button" data-d="x">关闭</button></div>`;
+  d.hidden=false;d.querySelector('[data-d=x]').focus()}
+document.addEventListener('click',e=>{const b=e.target.closest('.drv');if(b)司机(b.dataset.k,b.dataset.a,b.dataset.z)});
 $('#driver').addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;
   if(b.dataset.d==='x')return void($('#driver').hidden=true);
-  if(b.dataset.d==='copy'){const p=day[prog.done];try{await navigator.clipboard.writeText(p.地址||'');b.textContent='已复制'}catch(_){b.textContent='复制不了，请长按地址'}}});
+  if(b.dataset.d==='copy'){try{await navigator.clipboard.writeText(司机址);b.textContent='已复制'}catch(_){b.textContent='复制不了，请长按地址'}}});
 addEventListener('keydown',e=>{if(e.key==='Escape')$('#driver').hidden=true});
 function setTheme(i){ti=i;day=stateDay();resetReplan();
   me={xy:st().xy.slice(),label:st().名,idx:-1};renderThemes();renderDay();buildWhere();closeSheet();view.tilt>1?fitIsland():fit()}
