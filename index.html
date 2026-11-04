@@ -76,6 +76,7 @@ body.hasbar{padding-bottom:124px}
 .driver button{font:inherit;font-size:16px;padding:10px 18px;border-radius:999px;border:1px solid #bbb;background:#f3f3f3;color:#111;cursor:pointer}
 .cite{font:inherit;font-size:11px;line-height:1;color:color-mix(in srgb,var(--warm) 80%,var(--mute));background:none;border:0;padding:0 2px;margin:0 1px;vertical-align:super;cursor:pointer}.cite:hover,.cite:focus-visible{color:var(--warm)}
 q.hl{background:color-mix(in srgb,var(--warm) 16%,transparent);border-radius:4px}
+.claudego{display:inline-block;margin-top:6px;text-decoration:none}
 .whyold{margin-top:4px;font-size:13px;color:var(--mute)}.whyold summary{font-size:12px}
 /* 这天的状态（10-29）：比主题按钮小一号，跟在主题下面 */
 .states{display:flex;flex-wrap:wrap;align-items:center;gap:6px}.states .sl{font-size:13px;font-weight:700;color:var(--warm);margin-right:2px}
@@ -277,7 +278,7 @@ a:focus-visible,button:focus-visible,select:focus-visible,summary:focus-visible{
   <details class="imp" id="imp"><summary>贴一篇攻略，AI 帮你排进行程<small>把收藏的小红书攻略正文复制过来</small></summary>
     <textarea id="impText" rows="6" maxlength="20000" placeholder="把攻略正文粘贴到这里，小红书笔记、公众号文章都可以"></textarea>
     <div class="row"><button type="button" class="go" id="impGo" disabled>AI 识别</button><span class="tip">AI 认出里面的店，对到我们的店卡上，你确认后加进「想去」</span></div>
-    <p class="tip noai" hidden>这一步要实时调用 AI：在 claude.ai 登录后打开 <a href="https://claude.ai/artifact/3wojQn5HkEuUWLcQZrd672" target="_blank" rel="noopener">Claude 版页面</a>，会用你自己的 Claude（第一次会问你是否允许），不花这个网站的钱。</p>
+    <div class="noai" hidden><p class="tip">这一步要实时用 AI。网页版不接付费接口；点下面的按钮会在新标签页打开 Claude 版，用你自己的 Claude 账号运行（先登录 claude.ai，第一次会问你是否允许），不花这个网站的钱。</p><a class="go claudego" href="https://claude.ai/artifact/3wojQn5HkEuUWLcQZrd672#import" target="_blank" rel="noopener">用我的 Claude 账号打开</a></div>
     <div id="impOut"></div>
   </details>
 </section>
@@ -303,7 +304,7 @@ a:focus-visible,button:focus-visible,select:focus-visible,summary:focus-visible{
   <form id="planForm"><label for="planIn">临时改一下</label>
     <div class="row"><input id="planIn" maxlength="80" placeholder="比如：下雨了 / 走不动了 / 想多逛几家衣服店" autocomplete="off"><button type="submit" id="planGo">让 AI 改</button></div></form>
   <div class="chips" id="planChips"><button type="button">下雨了</button><button type="button">走不动了，少走点路</button><button type="button">想多逛几家衣服店</button><button type="button">有点饿，想早点吃饭</button><button type="button">想吃点甜的</button></div>
-  <p class="tip noai" hidden>这一步要实时调用 AI：在 claude.ai 登录后打开 <a href="https://claude.ai/artifact/3wojQn5HkEuUWLcQZrd672" target="_blank" rel="noopener">Claude 版页面</a>，会用你自己的 Claude（第一次会问你是否允许）。</p>
+  <div class="noai" hidden><p class="tip">这一步要实时用 AI。网页版不接付费接口；点下面的按钮会在新标签页打开 Claude 版，用你自己的 Claude 账号运行（先登录 claude.ai，第一次会问你是否允许），不花这个网站的钱。</p><a class="go claudego" href="https://claude.ai/artifact/3wojQn5HkEuUWLcQZrd672#plan" target="_blank" rel="noopener">用我的 Claude 账号打开</a></div>
   <div id="planOut" hidden></div>
 </section>
 <div class="rpentry"><button type="button" id="ptOpen" hidden>作者用：跑改计划真实测试</button></div>
@@ -1478,6 +1479,9 @@ $('#planChips').addEventListener('click',e=>{const b=e.target.closest('button');
 
 initRenderer();
 if(!ok3d)wrap.innerHTML='<div class="note" style="padding:16px">这台设备打不开 3D 地图（WebGL 不可用），下面的路线卡片照常可用。</div>';
-replan();showDay(firstReady(),false);
+/* 从网页版点「用我的 Claude 账号打开」过来（11-04）：#plan 等第一天渲染完滚到「临时改一下」，#import 展开导入攻略；关掉浏览器的滚动恢复，免得被上次的位置盖掉 */
+const 直达=location.hash==='#plan'?'#replan':location.hash==='#import'?'#imp':'';
+if(直达){try{history.scrollRestoration='manual'}catch(e){}if(直达==='#imp')$('#imp').open=true}
+replan();showDay(firstReady(),false).then(()=>{if(直达)setTimeout(()=>$(直达).scrollIntoView({block:'start'}),200)});
 </script>
 </body></html>
