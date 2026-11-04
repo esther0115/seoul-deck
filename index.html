@@ -74,6 +74,8 @@ body.hasbar{padding-bottom:124px}
 .driver .dp{font-size:clamp(20px,5.5vw,32px)}.driver .dz{font-size:15px;color:#555}
 .driver .dr{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
 .driver button{font:inherit;font-size:16px;padding:10px 18px;border-radius:999px;border:1px solid #bbb;background:#f3f3f3;color:#111;cursor:pointer}
+.cite{font:inherit;font-size:11px;line-height:1;color:color-mix(in srgb,var(--warm) 80%,var(--mute));background:none;border:0;padding:0 2px;margin:0 1px;vertical-align:super;cursor:pointer}.cite:hover,.cite:focus-visible{color:var(--warm)}
+q.hl{background:color-mix(in srgb,var(--warm) 16%,transparent);border-radius:4px}
 .whyold{margin-top:4px;font-size:13px;color:var(--mute)}.whyold summary{font-size:12px}
 /* 这天的状态（10-29）：比主题按钮小一号，跟在主题下面 */
 .states{display:flex;flex-wrap:wrap;align-items:center;gap:6px}.states .sl{font-size:13px;font-weight:700;color:var(--warm);margin-right:2px}
@@ -373,7 +375,7 @@ const src=q=>{const w=位置[q.类型]?(q.帖&&q.帖!=='无标题'?'的':'')+位
   const t=q.帖==='无标题'?`出自一篇没有标题的小红书笔记${w?'，'+w.replace(/^的/,''):''}`:q.帖?`出自《${esc(q.帖)}》${w}`:'',z=q.亲历==='转述'?'是攻略里转述别人的话':'';
   const 尾=[q.日期?`${q.日期} 发`:'',q.链接?`<a href="${esc(q.链接)}" target="_blank" rel="noopener">在小红书打开原帖</a>`:''].filter(Boolean).join(' · ');
   return t||z||尾?`<span class="from">${[t,z].filter(Boolean).join('，')}${尾?(t||z?' · ':'')+尾:''}</span>`:''};
-const quotes=(t,cls,qs)=>qs.length?`<div class="qgroup ${cls}"><h4>${t}</h4>${qs.map(q=>`<q>${esc(q.话)}</q>${src(q)}`).join('')}</div>`:'';
+const quotes=(t,cls,qs,n0=0)=>qs.length?`<div class="qgroup ${cls}"><h4>${t}</h4>${qs.map((q,i)=>`<q data-n="${n0+i+1}">${esc(q.话)}</q>${src(q)}`).join('')}</div>`:'';   /* data-n：页面顺序的编号，AI 总结的出处按它对（11-04） */
 const GC={吃饭:'--c-food',咖啡甜品:'--c-cafe',逛街:'--c-shop',拍照:'--c-photo',拍照景点:'--c-photo',喝一杯:'--c-drink'};
 const gkey=g=>g==='拍照景点'?'拍照':g;
 const rank=t=>{const m=String(t).match(/(\d{4})\s*트렌드랭킹\s*(\S+)\s*TOP\s*(\d+)/);if(!m)return t;
@@ -408,7 +410,10 @@ function body(p){
   const name=p.韩文名||p.店;
   const g=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name+' '+(p.地址||''))}`;
   const n=`https://map.naver.com/p/search/${encodeURIComponent(name)}`;
-  const qs=quotes('说好的','p',p.正||[])+quotes('说一般或不推荐的','n',p.反||[])+quotes('攻略里写的、其他原话','o',p.其他||[]);
+  const z1=(p.正||[]).length,z2=z1+(p.反||[]).length;
+  const qs=quotes('说好的','p',p.正||[])+quotes('说一般或不推荐的','n',p.反||[],z1)+quotes('攻略里写的、其他原话','o',p.其他||[],z2);
+  /* AI 总结逐句标出处（11-04，外部意见「哪句话支持哪个结论」）：每小句后面的小编号是它靠的原话，点一下展开并高亮；没有原话支撑的句子不标 */
+  let 圈=0;const 总结=p.结论分句?p.结论分句.map(x=>esc(x.文)+(x.据.length?`<button type="button" class="cite" data-q="${x.据.join(',')}" aria-label="看这句依据的原话">${'①②③④⑤⑥⑦⑧'[圈++]||'·'}</button>`:'')).join(''):esc(p.结论||'');
   /* 口碑条：人数比百分比诚实，评价少的店不会显示成「100% 好评」；不到 3 位时提醒仅供参考
      10-30 按外部意见改成互不重叠的三类：只说好、只说一般或不推荐、有好有坏（同一位作者两种都说过），三类相加等于总人数；
      说一般的那组也收「看不出是不是亲历」的作者，所以写「N 位作者评价过」，不写「去过的人」 */
@@ -434,7 +439,7 @@ function body(p){
   return `<div class="ko">${ko}</div>
     ${idol}
     ${p.介绍?`<p class="intro">${esc(p.介绍)}</p>`:''}
-    ${p.结论?`<p class="ai ${p.口碑色}"><span class="ai-badge">AI 总结</span>${esc(p.结论)}</p>`:''}
+    ${p.结论?`<p class="ai ${p.口碑色}"><span class="ai-badge">AI 总结</span>${总结}</p>`:''}
     ${rep}
     ${local}
     ${eat(p)}
@@ -1047,6 +1052,11 @@ const up=e=>{if(!ptrs.has(e.pointerId))return;ptrs.delete(e.pointerId);
 wrap.addEventListener('pointerup',up);wrap.addEventListener('pointercancel',up);
 wrap.addEventListener('wheel',e=>{if(e.target.closest('.sheet'))return;e.preventDefault();touched=true;view.mpp=Math.min(5,Math.max(.15,view.mpp*Math.exp(e.deltaY*.0015)));req()},{passive:false});
 /* 点口碑条里的差评人数：展开这张卡的原话，滚到差评那一组 */
+document.addEventListener('click',e=>{const b=e.target.closest('.cite');if(!b)return;const box=b.closest('.card,#sheetBody');if(!box)return;
+  const d=[...box.querySelectorAll('details')].find(x=>x.querySelector('q[data-n]'));if(!d)return;d.open=true;
+  box.querySelectorAll('q.hl').forEach(q=>q.classList.remove('hl'));const ns=b.dataset.q.split(',');
+  const qs=ns.map(n=>d.querySelector(`q[data-n="${n}"]`)).filter(Boolean);qs.forEach(q=>q.classList.add('hl'));
+  if(qs[0])qs[0].scrollIntoView({block:'center',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'})});
 document.addEventListener('click',e=>{const b=e.target.closest('.repneg');if(!b)return;const box=b.closest('.card,#sheetBody');const d=box&&box.querySelector('details');if(!d)return;
   d.open=true;const n=d.querySelector('.qgroup.n');(n||d).scrollIntoView({block:'nearest',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'})});
 ov.addEventListener('click',e=>{const b=e.target.closest('.pin');if(!b)return;
